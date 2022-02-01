@@ -3,3 +3,5 @@ node_modules
 .gitignore
 hardhat.config.js
 package-lock.json
+artifacts
+cache

@@ -34,7 +34,7 @@ contract Moloch is ReentrancyGuard {
     // EVENTS
     // ***************
     event SummonComplete(address indexed summoner, address[] tokens, uint256 summoningTime, uint256 periodDuration, uint256 votingPeriodLength, uint256 gracePeriodLength, uint256 proposalDeposit, uint256 dilutionBound, uint256 processingReward);
-    event SubmitProposal(address indexed applicant, uint256 sharesRequested, uint256 lootRequested, uint256 tributeOffered, address tributeToken, uint256 paymentRequested, address paymentToken, string details, bool[6] flags, uint256 proposalId, address indexed delegateKey, address indexed memberAddress);
+    event SubmitProposal(address indexed applicant, uint256 sharesRequested, uint256 lootRequested, uint256 tributeOffered, address tributeToken, uint256 paymentRequested, address paymentToken, bytes32 details, bool[6] flags, uint256 proposalId, address indexed delegateKey, address indexed memberAddress);
     event SponsorProposal(address indexed delegateKey, address indexed memberAddress, uint256 proposalId, uint256 proposalIndex, uint256 startingPeriod);
     event SubmitVote(uint256 proposalId, uint256 indexed proposalIndex, address indexed delegateKey, address indexed memberAddress, uint8 uintVote);
     event ProcessProposal(uint256 indexed proposalIndex, uint256 indexed proposalId, bool didPass);
@@ -93,7 +93,7 @@ contract Moloch is ReentrancyGuard {
         uint256 yesVotes; // the total number of YES votes for this proposal
         uint256 noVotes; // the total number of NO votes for this proposal
         bool[6] flags; // [sponsored, processed, didPass, cancelled, whitelist, guildkick]
-        string details; // proposal details - could be IPFS hash, plaintext, or JSON
+        bytes32 details; // proposal details - could be IPFS hash, plaintext, or JSON
         uint256 maxTotalSharesAndLootAtYesVote; // the maximum # of total shares encountered at a yes vote on this proposal
         mapping(address => Vote) votesByMember; // the votes on this proposal by each member
     }
@@ -185,7 +185,7 @@ contract Moloch is ReentrancyGuard {
         address tributeToken,
         uint256 paymentRequested,
         address paymentToken,
-        string memory details
+        bytes32 details
     ) public nonReentrant returns (uint256 proposalId) {
         require(sharesRequested.add(lootRequested) <= MAX_NUMBER_OF_SHARES_AND_LOOT, "too many shares requested");
         require(tokenWhitelist[tributeToken], "tributeToken is not whitelisted");
@@ -208,7 +208,7 @@ contract Moloch is ReentrancyGuard {
         return totals.proposalCount - 1; // return proposalId - contracts calling submit might want it
     }
 
-    function submitWhitelistProposal(address tokenToWhitelist, string memory details) public nonReentrant returns (uint256 proposalId) {
+    function submitWhitelistProposal(address tokenToWhitelist, bytes32 details) public nonReentrant returns (uint256 proposalId) {
         require(tokenToWhitelist != address(0), "must provide token address");
         require(!tokenWhitelist[tokenToWhitelist], "cannot already have whitelisted the token");
         require(approvedTokens.length < MAX_TOKEN_WHITELIST_COUNT, "cannot submit more whitelist proposals");
@@ -220,7 +220,7 @@ contract Moloch is ReentrancyGuard {
         return totals.proposalCount - 1;
     }
 
-    function submitGuildKickProposal(address memberToKick, string memory details) public nonReentrant returns (uint256 proposalId) {
+    function submitGuildKickProposal(address memberToKick, bytes32 details) public nonReentrant returns (uint256 proposalId) {
         Member memory member = members[memberToKick];
 
         require(member.shares > 0 || member.loot > 0, "member must have at least one share or one loot");
@@ -241,7 +241,7 @@ contract Moloch is ReentrancyGuard {
         address tributeToken,
         uint256 paymentRequested,
         address paymentToken,
-        string memory details,
+        bytes32 details,
         bool[6] memory flags
     ) internal {
 
