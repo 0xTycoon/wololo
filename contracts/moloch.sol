@@ -79,6 +79,11 @@ contract Moloch is ReentrancyGuard {
         uint256 jailed; // set to proposalIndex of a passing guild kick proposal for this member, prevents voting on and sponsoring proposals
     }
 
+    struct Tally {
+        uint256 yesVotes; // the total number of YES votes for this proposal
+        uint256 noVotes; // the total number of NO votes for this proposal
+    }
+
     struct Proposal {
         address applicant; // the applicant who wishes to become a member - this key will be used for withdrawals (doubles as guild kick target for gkick proposals)
         address proposer; // the account that submitted the proposal (can be non-member)
@@ -90,14 +95,12 @@ contract Moloch is ReentrancyGuard {
         uint256 paymentRequested; // amount of tokens requested as payment
         address paymentToken; // payment token contract reference
         uint256 startingPeriod; // the period in which voting can start for this proposal
-        uint256 yesVotes; // the total number of YES votes for this proposal
-        uint256 noVotes; // the total number of NO votes for this proposal
         bool[6] flags; // [sponsored, processed, didPass, cancelled, whitelist, guildkick]
         bytes32 details; // proposal details - could be IPFS hash, plaintext, or JSON
         uint256 maxTotalSharesAndLootAtYesVote; // the maximum # of total shares encountered at a yes vote on this proposal
-        mapping(address => Vote) votesByMember; // the votes on this proposal by each member
     }
-
+    mapping (address => mapping(uint256 => Vote)) votesByMember; // the votes on each proposal by each member
+    //mapping (uint256 => mapping(address => Vote)) votesByMember;
     mapping(address => bool) public tokenWhitelist;
     address[] public approvedTokens;
 
@@ -108,6 +111,7 @@ contract Moloch is ReentrancyGuard {
     mapping(address => address) public memberAddressByDelegateKey;
 
     mapping(uint256 => Proposal) public proposals;
+    mapping(uint256 => Tally) public tallies; // keeps tallies for proposals
 
     uint256[] public proposalQueue;
 
@@ -256,7 +260,6 @@ contract Moloch is ReentrancyGuard {
         p.paymentRequested = paymentRequested;
         p.paymentToken = paymentToken;
         p.startingPeriod = 0;
-        p.yesVotes = 0;
         p.flags = flags;
         p.details = details;
         p.maxTotalSharesAndLootAtYesVote = 0;
@@ -319,22 +322,22 @@ contract Moloch is ReentrancyGuard {
     function submitVote(uint256 proposalIndex, uint8 uintVote) public nonReentrant onlyDelegate {
         address memberAddress = memberAddressByDelegateKey[msg.sender];
         Member storage member = members[memberAddress];
-
+        Vote  voteRecord = votesByMember[memberAddress][proposalIndex];
         require(proposalIndex < proposalQueue.length, "proposal does not exist");
         Proposal storage proposal = proposals[proposalQueue[proposalIndex]];
-
+        Tally storage tally = tallies[proposalQueue[proposalIndex]];
         require(uintVote < 3, "must be less than 3");
         Vote vote = Vote(uintVote);
 
         require(getCurrentPeriod() >= proposal.startingPeriod, "voting period has not started");
         require(!hasVotingPeriodExpired(proposal.startingPeriod), "proposal voting period has expired");
-        require(proposal.votesByMember[memberAddress] == Vote.Null, "member has already voted");
+        require(voteRecord == Vote.Null, "member has already voted");
         require(vote == Vote.Yes || vote == Vote.No, "vote must be either Yes or No");
 
-        proposal.votesByMember[memberAddress] = vote;
+        votesByMember[memberAddress][proposalIndex] = vote;
 
         if (vote == Vote.Yes) {
-            proposal.yesVotes = proposal.yesVotes.add(member.shares);
+            tally.yesVotes = tally.yesVotes.add(member.shares);
 
             // set highest index (latest) yes vote - must be processed for member to ragequit
             if (proposalIndex > member.highestIndexYesVote) {
@@ -347,7 +350,7 @@ contract Moloch is ReentrancyGuard {
             }
 
         } else if (vote == Vote.No) {
-            proposal.noVotes = proposal.noVotes.add(member.shares);
+            tally.noVotes = tally.noVotes.add(member.shares);
         }
 
         // NOTE: subgraph indexes by proposalId not proposalIndex since proposalIndex isn't set untill it's been sponsored but proposal is created on submission
@@ -495,8 +498,8 @@ contract Moloch is ReentrancyGuard {
 
     function _didPass(uint256 proposalIndex) internal returns (bool didPass) {
         Proposal storage proposal = proposals[proposalQueue[proposalIndex]];
-
-        didPass = proposal.yesVotes > proposal.noVotes;
+        Tally memory tally = tallies[proposalQueue[proposalIndex]];
+        didPass = tally.yesVotes > tally.noVotes;
 
         // Make the proposal fail if the dilutionBound is exceeded
         if ((totals.totalShares.add(totals.totalLoot)).mul(dilutionBound) < proposal.maxTotalSharesAndLootAtYesVote) {
@@ -674,7 +677,7 @@ contract Moloch is ReentrancyGuard {
     function getMemberProposalVote(address memberAddress, uint256 proposalIndex) public view returns (Vote) {
         require(members[memberAddress].exists, "member does not exist");
         require(proposalIndex < proposalQueue.length, "proposal does not exist");
-        return proposals[proposalQueue[proposalIndex]].votesByMember[memberAddress];
+        return  votesByMember[memberAddress][proposalIndex];
     }
 
     function getTokenCount() public view returns (uint256) {
