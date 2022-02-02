@@ -9,7 +9,9 @@ Summoning a DAO for the @cigtoken
 
 ### About
 
-Wololo is a Moloch v2 mod that implements a DAO for the CEO of CryptoPunks (CIG).
+Wololo is a Moloch v2 mod that aims to implement a DAO for the CEO of CryptoPunks (CIG).
+
+Pople would deposit their LP tokens as a tribute, then the DAO would farm them to build a treasury. The DAO could also buy the CEO title and operate all the functions of the CEO.
 
 ### Changes:
 
