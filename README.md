@@ -3,7 +3,7 @@
 
 ![Preview](wololo.png)
 
-Summaning a DAO for the @cigtoken
+Summoning a DAO for the @cigtoken
 
 ## A MOLOCH DAO MOD
 
